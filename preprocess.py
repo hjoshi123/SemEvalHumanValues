@@ -34,10 +34,12 @@ def load_json_file(filepath):
 
 def load_values_from_json(filepath):
     """Load values per level from json-file from `filepath`"""
+    print('Hello')
     json_values = load_json_file(filepath)
-    values = { "1":set() }
+    values = { "1":list() }
     for value in json_values:
-        values['1'].add(value)
+        values["1"].append(value)
+    values["1"] = sorted(values["1"])
     return values
 
 
