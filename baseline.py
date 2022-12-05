@@ -22,10 +22,20 @@ def label_argument(values):
 
 
 def random_prediction(values, arguments):
-    print("Random Prediction begining")
+    print("Random Prediction")
     preds = []
     for i in range(len(arguments)):
         preds.append(label_argument(values))
+    
+    print(f"Added predictions for {len(arguments)} arguments")
+    return numpy.array(preds)
+
+
+def all_ones(values, arguments):
+    print("Predicting all 1")
+    preds = []
+    for i in range(len(arguments)):
+        preds.append([1]*len(values))
     
     print(f"Added predictions for {len(arguments)} arguments")
     return numpy.array(preds)
