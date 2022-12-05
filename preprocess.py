@@ -34,7 +34,6 @@ def load_json_file(filepath):
 
 def load_values_from_json(filepath):
     """Load values per level from json-file from `filepath`"""
-    print('Hello')
     json_values = load_json_file(filepath)
     values = { "1":list() }
     for value in json_values:
