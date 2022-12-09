@@ -137,7 +137,7 @@ def train_bert_model(train_dataframe, model_dir, labels, test_dataframe=None, nu
         metric_for_best_model='marco-avg-f1score'
     )
 
-    model = load_model_from_data_dir("bert-base-uncased", num_labels=len(labels))
+    model = load_model_from_data_dir("prajjwal1/bert-small", num_labels=len(labels))
 
     multi_trainer = MultiLabelTrainer(
         model,
