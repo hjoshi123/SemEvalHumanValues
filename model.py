@@ -5,8 +5,9 @@ from transformers import (AutoTokenizer, AutoModelForSequenceClassification,
 from sklearn.metrics import f1_score
 import torch
 import numpy as np
+from typing import List, Dict
 
-tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+from tokenizer import tokenize_and_encode, get_Tokenizer
 
 def accuracy_thresh(y_pred, y_true, thresh=0.5, sigmoid=True):
     """Compute accuracy of predictions"""
@@ -37,6 +38,7 @@ def f1_score_per_label(y_pred, y_true, value_classes, thresh=0.5, sigmoid=True):
     return f1_scores
 
 
+
 def compute_metrics(eval_pred, value_classes):
     """Custom metric calculation function for MultiLabelTrainer"""
     predictions, labels = eval_pred
@@ -44,11 +46,9 @@ def compute_metrics(eval_pred, value_classes):
     return {'accuracy_thresh': accuracy_thresh(predictions, labels), 'f1-score': f1scores,
             'marco-avg-f1score': f1scores['avg-f1-score']}
 
-def tokenize_and_encode(examples):
-    return tokenizer(examples['Premise'], truncation=True)
 
 def convert_dataframe_to_dataset(training_df, test_df, labels):
-    column_intersect = [x for x in (['Premise'] + labels) if x in training_df.columns.values]
+    column_intersect = [x for x in (['Premise', 'Stance', 'Conclusion'] + labels) if x in training_df.columns.values]
     train_dataset = Dataset.from_dict((training_df[column_intersect]).to_dict('list'))
     test_dataset = Dataset.from_dict((test_df[column_intersect]).to_dict('list'))
 
@@ -61,16 +61,17 @@ def convert_dataframe_to_dataset(training_df, test_df, labels):
 
     cols = ds['train'].column_names
     cols.remove('labels')
-
-    ds_enc = ds.map(tokenize_and_encode, batched=True, remove_columns=cols)
+    ds_enc = ds.map(tokenize_and_encode, batched=False, remove_columns=cols)
 
     cols.remove('Premise')
+    cols.remove('Stance')
+    cols.remove('Conclusion')
 
     return ds_enc, cols
 
 
 def load_model_from_data_dir(model_dir, num_labels):
-    model = AutoModelForSequenceClassification.from_pretrained(model_dir, num_labels=num_labels)
+    model = AutoModelForSequenceClassification.from_pretrained("prajjwal1/bert-small", num_labels=num_labels)
     return model
 
 
@@ -106,12 +107,12 @@ def predict_bert_model(dataframe, model_dir, labels):
         per_device_eval_batch_size=batch_size
     )
 
-    model = load_model_from_data_dir(model_dir, num_labels=num_labels)
+    model = load_model_from_data_dir(model, num_labels=num_labels)
 
     multi_trainer = MultiLabelTrainer(
         model,
         args,
-        tokenizer=tokenizer
+        tokenizer=get_Tokenizer()
     )
 
     prediction = 1 * (multi_trainer.predict(ds['train']).predictions > 0.5)
@@ -122,6 +123,11 @@ def train_bert_model(train_dataframe, model_dir, labels, test_dataframe=None, nu
     if test_dataframe is None:
         test_dataframe = train_dataframe
     ds, labels = convert_dataframe_to_dataset(train_dataframe, test_dataframe, labels)
+#     print("DATASET....")
+#     print(ds["train"])
+#     print(ds["test"])
+#     print("Labels")
+#     print(labels)
 
     batch_size = 8
 
@@ -137,7 +143,7 @@ def train_bert_model(train_dataframe, model_dir, labels, test_dataframe=None, nu
         metric_for_best_model='marco-avg-f1score'
     )
 
-    model = load_model_from_data_dir("prajjwal1/bert-small", num_labels=len(labels))
+    model = load_model_from_data_dir(model_dir, num_labels=len(labels))
 
     multi_trainer = MultiLabelTrainer(
         model,
@@ -145,7 +151,7 @@ def train_bert_model(train_dataframe, model_dir, labels, test_dataframe=None, nu
         train_dataset=ds["train"],
         eval_dataset=ds["test"],
         compute_metrics=lambda x: compute_metrics(x, labels),
-        tokenizer=tokenizer
+        tokenizer=get_Tokenizer()
     )
 
     multi_trainer.train()
