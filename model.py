@@ -2,7 +2,7 @@ from datasets import (Dataset, DatasetDict, load_dataset)
 from transformers import (AutoTokenizer, AutoModelForSequenceClassification,
                           PreTrainedModel, BertModel, BertForSequenceClassification,
                           TrainingArguments, Trainer)
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, precision_score, recall_score
 import torch
 import numpy as np
 from typing import List, Dict
@@ -38,13 +38,57 @@ def f1_score_per_label(y_pred, y_true, value_classes, thresh=0.5, sigmoid=True):
     return f1_scores
 
 
+def operation_per_label(name, op, y_pred, y_true, value_classes, thresh=0.5, sigmoid=True):
+    """Compute label-wise and averaged F1-scores"""
+    y_pred = torch.from_numpy(y_pred)
+    y_true = torch.from_numpy(y_true)
+    if sigmoid:
+        y_pred = y_pred.sigmoid()
+
+    y_true = y_true.bool().numpy()
+    y_pred = (y_pred > thresh).numpy()
+
+    scores = {}
+    for i, v in enumerate(value_classes):
+        scores[v] = round(op(y_true[:, i], y_pred[:, i], zero_division=0), 2)
+
+    scores['avg-'+ name ] = round(np.mean(list(scores.values())), 2)
+
+    return scores
+
+def precision_per_label(y_pred, y_true, value_classes, thresh=0.5, sigmoid=True):
+    y_pred = torch.from_numpy(y_pred)
+    y_true = torch.from_numpy(y_true)
+    if sigmoid:
+        y_pred = y_pred.sigmoid()
+        
+    y_true = y_true.bool().numpy()
+    y_pred = (y_pred > thresh).numpy()
+    
+    precision_score = {}
+    for i, v in enumerate(value_classes):
+        precision_score[v] = round(precision_score(y_true[:, i], y_pred[:, i], zero_division=0), 2)
+    
+    precision_score['avg-precision-score'] = round(np.mean(list(precision_score.values())), 2)
+    
+    return precision_score
+
+
 
 def compute_metrics(eval_pred, value_classes):
     """Custom metric calculation function for MultiLabelTrainer"""
     predictions, labels = eval_pred
-    f1scores = f1_score_per_label(predictions, labels, value_classes)
-    return {'accuracy_thresh': accuracy_thresh(predictions, labels), 'f1-score': f1scores,
-            'marco-avg-f1score': f1scores['avg-f1-score']}
+    print("Results: ", predictions, labels)
+#     f1scores = f1_score_per_label(predictions, labels, value_classes)
+    f1scores = operation_per_label('f1-score', f1_score, predictions, labels, value_classes)
+    precision = operation_per_label('precision', precision_score, predictions, labels, value_classes)
+    recall = operation_per_label('recall', recall_score, predictions, labels, value_classes)
+
+    return {'accuracy_thresh': accuracy_thresh(predictions, labels), 
+            'f1-score': f1scores, 'marco-avg-f1score': f1scores['avg-f1-score'], 
+            'precision': precision, 'avg-precision': precision['avg-precision'],
+            'recall': recall, 'avg-recall': recall['avg-recall'] 
+           }
 
 
 def convert_dataframe_to_dataset(training_df, test_df, labels):
