@@ -115,7 +115,7 @@ def convert_dataframe_to_dataset(training_df, test_df, labels):
 
 
 def load_model_from_data_dir(model_dir, num_labels):
-    model = AutoModelForSequenceClassification.from_pretrained("prajjwal1/bert-small", num_labels=num_labels)
+    model = AutoModelForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=num_labels)
     return model
 
 
