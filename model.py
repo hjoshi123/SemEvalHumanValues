@@ -2,11 +2,29 @@ from datasets import (Dataset, DatasetDict, load_dataset)
 from transformers import (AutoTokenizer, AutoModelForSequenceClassification,
                           PreTrainedModel, BertModel, BertForSequenceClassification,
                           TrainingArguments, Trainer)
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, precision_score, recall_score
 import torch
 import numpy as np
 
 tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+
+def operation_per_label(name, op, y_pred, y_true, value_classes, thresh=0.5, sigmoid=True):
+    """Compute label-wise and averaged F1-scores"""
+    y_pred = torch.from_numpy(y_pred)
+    y_true = torch.from_numpy(y_true)
+    if sigmoid:
+        y_pred = y_pred.sigmoid()
+
+    y_true = y_true.bool().numpy()
+    y_pred = (y_pred > thresh).numpy()
+
+    scores = {}
+    for i, v in enumerate(value_classes):
+        scores[v] = round(op(y_true[:, i], y_pred[:, i], zero_division=0), 2)
+
+    scores['avg-'+ name ] = round(np.mean(list(scores.values())), 2)
+
+    return scores
 
 def accuracy_thresh(y_pred, y_true, thresh=0.5, sigmoid=True):
     """Compute accuracy of predictions"""
@@ -40,9 +58,15 @@ def f1_score_per_label(y_pred, y_true, value_classes, thresh=0.5, sigmoid=True):
 def compute_metrics(eval_pred, value_classes):
     """Custom metric calculation function for MultiLabelTrainer"""
     predictions, labels = eval_pred
-    f1scores = f1_score_per_label(predictions, labels, value_classes)
-    return {'accuracy_thresh': accuracy_thresh(predictions, labels), 'f1-score': f1scores,
-            'marco-avg-f1score': f1scores['avg-f1-score']}
+    # f1scores = f1_score_per_label(predictions, labels, value_classes)
+    f1scores = operation_per_label('f1-score', f1_score, predictions, labels, value_classes)
+    precision = operation_per_label('precision', precision_score, predictions, labels, value_classes)
+    recall = operation_per_label('recall', recall_score, predictions, labels, value_classes)
+    return {'accuracy_thresh': accuracy_thresh(predictions, labels), 
+            'f1-score': f1scores, 'marco-avg-f1score': f1scores['avg-f1-score'], 
+            'precision': precision, 'avg-precision': precision['avg-precision'],
+            'recall': recall, 'avg-recall': recall['avg-recall'] 
+           }
 
 def tokenize_and_encode(examples):
     return tokenizer(examples['Premise'], truncation=True)
