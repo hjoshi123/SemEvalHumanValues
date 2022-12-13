@@ -55,6 +55,10 @@ def f1_score_per_label(y_pred, y_true, value_classes, thresh=0.5, sigmoid=True):
     return f1_scores
 
 
+mets = []
+def get_met():
+  return mets
+
 def compute_metrics(eval_pred, value_classes):
     """Custom metric calculation function for MultiLabelTrainer"""
     predictions, labels = eval_pred
@@ -62,11 +66,13 @@ def compute_metrics(eval_pred, value_classes):
     f1scores = operation_per_label('f1-score', f1_score, predictions, labels, value_classes)
     precision = operation_per_label('precision', precision_score, predictions, labels, value_classes)
     recall = operation_per_label('recall', recall_score, predictions, labels, value_classes)
-    return {'accuracy_thresh': accuracy_thresh(predictions, labels), 
+    met = {'accuracy_thresh': accuracy_thresh(predictions, labels), 
             'f1-score': f1scores, 'marco-avg-f1score': f1scores['avg-f1-score'], 
             'precision': precision, 'avg-precision': precision['avg-precision'],
             'recall': recall, 'avg-recall': recall['avg-recall'] 
            }
+    mets.append(met)
+    return met
 
 def tokenize_and_encode(examples):
     return tokenizer(examples['Premise'], truncation=True)
@@ -161,7 +167,7 @@ def train_bert_model(train_dataframe, model_dir, labels, test_dataframe=None, nu
         metric_for_best_model='marco-avg-f1score'
     )
 
-    model = load_model_from_data_dir("prajjwal1/bert-small", num_labels=len(labels))
+    model = load_model_from_data_dir("bert-base-uncased", num_labels=len(labels))
 
     multi_trainer = MultiLabelTrainer(
         model,
